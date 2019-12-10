@@ -5,30 +5,22 @@
 
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
+const pkg = require("./package.json");
 const vscode = require("vscode");
 const startYearPattern = "{startyear}-";
 const endYearPattern = "{endyear}";
 const companyNamePattern = "{companyname}";
+const companyPattern = "([a-z A-Z,.]+)";
 const yearPattern = "[0-9][0-9][0-9][0-9]";
 const yearCapture = `(${yearPattern})`;
 const optionalStartYearCapture = `(${yearPattern}-)?`;
-const companyName = "OpenEye Scientific Software";
-const template = `/*
+
+const copyrightTemplate = `/*
  * Copyright (c) ${startYearPattern}${endYearPattern} ${companyNamePattern}
  * All rights reserved.
  */
 `;
-const templateLineCt = template.split("\n").length;
-const matcher = new RegExp(
-  template
-    .replace(RegExp("\\/", "g"), "\\/")
-    .replace(RegExp("\\(", "g"), "\\(")
-    .replace(RegExp("\\)", "g"), "\\)")
-    .replace(RegExp("\\*", "g"), "\\*")
-    .replace(startYearPattern, optionalStartYearCapture)
-    .replace(endYearPattern, yearCapture)
-    .replace(companyNamePattern, companyName)
-);
+const copyrightTemplateLineCt = copyrightTemplate.split("\n").length;
 
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
@@ -41,7 +33,51 @@ function range(start, end) {
     return idx + start;
   });
 }
-function activate(context) {
+
+function populateTemplate(template, startYear, endYear, companyName) {
+  startYear =
+    startYear === null || startYear === endYear ? "" : startYear + "-";
+
+  return template
+    .replace(startYearPattern, startYear)
+    .replace(endYearPattern, endYear)
+    .replace(companyNamePattern, companyName);
+}
+
+function updateCopyright(initialLines, companyName) {
+  const matcher = new RegExp(
+    copyrightTemplate
+      .replace(RegExp("\\/", "g"), "\\/")
+      .replace(RegExp("\\(", "g"), "\\(")
+      .replace(RegExp("\\)", "g"), "\\)")
+      .replace(RegExp("\\*", "g"), "\\*")
+      .replace(startYearPattern, optionalStartYearCapture)
+      .replace(endYearPattern, yearCapture)
+      .replace(companyNamePattern, companyPattern)
+  );
+  let res = matcher.exec(initialLines);
+  let curYear = new Date().getFullYear().toString();
+  let removeOldLines = false;
+  let startYear;
+  if (res) {
+    // The start year is EITHER the first match (range) or the second (singular)
+    startYear = res[1] ? res[1].slice(0, res[1].length - 1) : res[2];
+    removeOldLines = true;
+  } else {
+    startYear = curYear;
+  }
+
+  return {
+    newText: populateTemplate(
+      copyrightTemplate,
+      startYear,
+      curYear,
+      companyName
+    ),
+    removeInitialLines: removeOldLines
+  };
+}
+function activate() {
   // Use the console to output diagnostic information (console.log) and errors (console.error)
   // This line of code will only be executed once when your extension is activated
   console.log(
@@ -53,52 +89,29 @@ function activate(context) {
   vscode.workspace.onWillSaveTextDocument(evt => {
     let doc = evt.document;
     if (doc.languageId === "javascript") {
+      let cfg = vscode.workspace.getConfiguration(pkg.name);
+      let companyName = cfg.get("companyname");
+
       let textEditor = vscode.window.activeTextEditor;
-      let startingBlock = range(0, templateLineCt)
+      let startingBlock = range(0, copyrightTemplateLineCt)
         .map(lineNo => {
           return doc.lineAt(lineNo).text || "";
         })
         .join("\n");
-      let res = matcher.exec(startingBlock);
-      let curYear = new Date().getFullYear().toString();
-      let removeOldLines = false;
-      let startYear;
-      if (res) {
-        // The start year is EITHER the first match (range) or the second (singular)
-        startYear = res[1] ? res[1].slice(0, res[1].length - 1) : res[2];
-        removeOldLines = true;
-      } else {
-        startYear = curYear;
+
+      let ret = updateCopyright(startingBlock, companyName);
+      if (ret) {
+        textEditor.edit(editBuilder => {
+          if (ret.removeInitialLines)
+            editBuilder.delete(
+              new vscode.Range(0, 0, copyrightTemplateLineCt - 1, 0)
+            );
+
+          editBuilder.insert(new vscode.Position(0, 0), ret.newText);
+        });
       }
-
-      textEditor.edit(editBuilder => {
-        if (removeOldLines)
-          editBuilder.delete(new vscode.Range(0, 0, templateLineCt - 1, 0));
-        if (curYear === startYear) {
-          startYear = "";
-        } else startYear = startYear + "-";
-
-        let newText = template
-          .replace(endYearPattern, curYear)
-          .replace(companyNamePattern, companyName)
-          .replace(startYearPattern, startYear);
-
-        editBuilder.insert(new vscode.Position(0, 0), newText);
-      });
     }
   });
-
-  let disposable = vscode.commands.registerCommand(
-    "extension.helloWorld",
-    function() {
-      // The code you place here will be executed every time your command is executed
-
-      // Display a message box to the user
-      vscode.window.showInformationMessage("Hello World!");
-    }
-  );
-
-  context.subscriptions.push(disposable);
 }
 exports.activate = activate;
 
@@ -107,5 +120,8 @@ function deactivate() {}
 
 module.exports = {
   activate,
-  deactivate
+  deactivate,
+  updateCopyright,
+  copyrightTemplate,
+  populateTemplate
 };

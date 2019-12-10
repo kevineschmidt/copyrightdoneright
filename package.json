@@ -14,12 +14,16 @@
   ],
   "main": "./extension.js",
   "contributes": {
-    "commands": [
-      {
-        "command": "extension.helloWorld",
-        "title": "Hello World"
+    "configuration": {
+      "title": "Copyright Done Right",
+      "properties": {
+        "copyrightdoneright.companyname": {
+          "type": "string",
+          "default": "Your Company Name",
+          "description": "Your company name for the copyright header"
+        }
       }
-    ]
+    }
   },
   "scripts": {
     "test": "node ./test/runTest.js"
