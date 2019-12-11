@@ -1,3 +1,7 @@
+/*
+ * Copyright (c) 2019 OpenEye Scientific Software
+ * All rights reserved.
+ */
 const assert = require("assert");
 
 const testCompanyName = "Foo, Inc.";
@@ -34,6 +38,28 @@ const testData = [
     },
     transform: updateCopyrightTransform,
     message: "Should add a header"
+  },
+  {
+    input: myExtension.populateTemplate(
+      myExtension.copyrightTemplate,
+      null,
+      "2019",
+      testCompanyName
+    ),
+    output: {
+      newText: myExtension.populateTemplate(
+        myExtension.copyrightTemplate,
+        null,
+        "2019",
+        testCompanyName
+      ),
+      removeInitialLines: true
+    },
+    transform: input => {
+      input = input.replace(RegExp(/ /, "g"), "  ");
+      return updateCopyrightTransform(input);
+    },
+    message: "Should not be whitespace sensitive"
   },
   {
     input: myExtension.populateTemplate(
