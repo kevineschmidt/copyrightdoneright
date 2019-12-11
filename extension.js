@@ -1,4 +1,8 @@
 /*
+ * Copyright (c) 2019 OpenEye Scientific Software
+ * All rights reserved.
+ */
+/*
  *   Copyright (c) 2019 OpenEye Scientific Software, Inc
  *   All rights reserved.
  */
@@ -47,10 +51,11 @@ function populateTemplate(template, startYear, endYear, companyName) {
 function updateCopyright(initialLines, companyName) {
   const matcher = new RegExp(
     copyrightTemplate
-      .replace(RegExp("\\/", "g"), "\\/")
-      .replace(RegExp("\\(", "g"), "\\(")
-      .replace(RegExp("\\)", "g"), "\\)")
-      .replace(RegExp("\\*", "g"), "\\*")
+      .replace(RegExp("\\/", "g"), "\\/") // Escape /
+      .replace(RegExp("\\(", "g"), "\\(") // Escape ()
+      .replace(RegExp("\\)", "g"), "\\)") // Escape )
+      .replace(RegExp("\\*", "g"), "\\*") // Escape *
+      .replace(RegExp(/ /, "g"), " +") // Whitespace insensitive
       .replace(startYearPattern, optionalStartYearCapture)
       .replace(endYearPattern, yearCapture)
       .replace(companyNamePattern, companyPattern)
@@ -90,8 +95,7 @@ function activate() {
     let doc = evt.document;
     if (doc.languageId === "javascript") {
       let cfg = vscode.workspace.getConfiguration(pkg.name);
-      let companyName = cfg.get("companyname");
-
+      let companyName = cfg.get("companyname") || "Company Name";
       let textEditor = vscode.window.activeTextEditor;
       let startingBlock = range(0, copyrightTemplateLineCt)
         .map(lineNo => {
